@@ -9,7 +9,7 @@ No video-generation model, no API keys, no GPU required.
   on-screen reveals follow the spoken words
 - Every stage (TTS, renderer, encoder, reference analyser) is a swappable provider chosen in `motion.config.yaml`
 - Built as a [Hermes Agent](https://hermes-agent.nousresearch.com) skill, but usable on its own as a library and CLI
-- MIT licensed. Third-party components: see [NOTICE.md](NOTICE.md)
+- MIT licensed source, but the default install pulls in GPL components at runtime: see [Licence implications](#licence-implications) and [NOTICE.md](NOTICE.md)
 
 ## Requirements
 
@@ -22,9 +22,9 @@ Windows, macOS and Linux work. Windows is the primary dev machine; a Windows-onl
 ## Quickstart
 
 ```bash
-git clone <this repo> hermes-motion
+git clone https://github.com/rayansharma10/hermes-motion.git hermes-motion
 cd hermes-motion
-uv sync --extra piper                    # Python deps (piper is the optional fallback voice)
+uv sync                                  # Python deps (add --extra piper for the optional Piper voice)
 uv run playwright install chromium       # headless browser, one-off
 uv run motion doctor --fetch             # checks everything and downloads TTS models (~420 MB)
 uv run motion render examples/quickstart.json -o out/quickstart.mp4
@@ -90,12 +90,40 @@ See [docs/SKILL-INSTALL.md](docs/SKILL-INSTALL.md).
 ## Development
 
 ```bash
-uv sync --extra piper
-uv run pytest          # tests use a fake offline TTS; render tests need ffmpeg and Chromium
+uv sync
+uv run pytest          # tests use a fake offline TTS and download nothing; render tests need ffmpeg and Chromium
 ```
+
+## Security model
+
+A storyboard is treated as untrusted input. Style tokens are validated, `custom` HTML, `music` and
+`style.from_reference` must be files inside the storyboard's own folder (set
+`security.allow_absolute_paths: true` to lift that), and the renderer blocks network access and
+local files outside the render folder. Note that a `custom` scene still runs arbitrary JavaScript
+inside the headless browser, so only render `custom` scenes you trust.
+
+## Licence implications
+
+The code in this repository is MIT. What you install around it is not all MIT:
+
+- A plain `uv sync` installs `kokoro-onnx`, which requires `phonemizer` (GPL-3.0-or-later) and
+  `espeakng-loader` (bundles eSpeak NG, GPL-3.0 upstream). `--extra piper` adds `piper-tts`
+  (GPL-3.0-or-later). So skipping the Piper extra does not give you a GPL-free environment.
+- This repo does not redistribute any of them; they are fetched by `uv` from PyPI. If you
+  redistribute an environment that contains them (container image, installer, bundled app), the GPL
+  terms for those components apply to what you ship. Whether using them as libraries also affects
+  how you may license your own combined work is a legal question this project has not answered:
+  get advice if it matters to you.
+- Voices have their own licences. In particular `en_US-ryan-medium` (Piper) is CC BY-NC-SA 4.0,
+  non-commercial. The per-voice details, including what is still **UNVERIFIED**, are in
+  [NOTICE.md](NOTICE.md).
+- Whether the licence of a voice or of the GPL libraries extends to the audio/video you generate is
+  also **UNVERIFIED** here. Check the voice's terms before publishing commercially.
 
 ## Notes and limits
 
 - Word timestamps are estimated per sentence (the engines expose no alignment), accurate to roughly 100-150 ms.
+- Only 1920x1080 output is supported; other `video.width/height` values are rejected.
+- Rendering is deterministic for a given machine and worker count; it is not guaranteed to be bit-identical across worker counts, fonts or OSes.
 - Hardware encoding (`encoder.hw_encode: true`, AMD `h264_amf`) is optional and falls back to libx264 automatically.
 - Phase 1 scope: see [SPEC.md](SPEC.md) for what is planned next (polished CLI, music mixing, more renderers).
