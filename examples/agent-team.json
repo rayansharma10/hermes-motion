@@ -1,5 +1,5 @@
 {
-  "title": "How a Hermes Agent setup works",
+  "title": "How an agent team works",
   "fps": 30,
   "target_seconds": 16,
   "style": {"preset": "clean"},
@@ -9,61 +9,61 @@
     {
       "id": "hook",
       "template": "title",
-      "narration": "One PC. One assistant. A team behind her.",
-      "data": {"kicker": "Hermes Agent", "title": "One PC. One assistant. A team behind her."}
+      "narration": "One assistant, with a team of specialists behind it.",
+      "data": {"kicker": "Multi-agent workflow", "title": "Meet the agent team"}
     },
     {
       "id": "front-door",
       "template": "diagram",
-      "narration": "Concierge, a free local model, posts jobs to Kanban.",
+      "narration": "A planner takes your request and posts jobs to a task board.",
       "data": {
         "nodes": [
-          {"id": "you", "label": "You", "sub": "Slack, from anywhere"},
-          {"id": "concierge", "label": "Concierge", "sub": "free local model", "kind": "accent"},
-          {"id": "board", "label": "Kanban board", "sub": "jobs and hand-offs"}
+          {"id": "you", "label": "You", "sub": "any chat app"},
+          {"id": "planner", "label": "Planner", "sub": "small local model", "kind": "accent"},
+          {"id": "board", "label": "Task board", "sub": "jobs and hand-offs"}
         ],
-        "edges": ["you -> concierge", "concierge -> board"]
+        "edges": ["you -> planner", "planner -> board"]
       }
     },
     {
       "id": "specialists",
       "template": "diagram",
-      "narration": "Dev, uni, hardware and reviewer take over.",
+      "narration": "Coder, researcher, tester and reviewer pick them up.",
       "data": {
         "nodes": [
-          {"id": "board", "label": "Kanban board", "kind": "accent"},
-          {"id": "dev", "label": "dev", "sub": "code"},
-          {"id": "uni", "label": "uni", "sub": "coursework"},
-          {"id": "hw", "label": "hardware", "sub": "electronics"},
-          {"id": "rev", "label": "reviewer", "sub": "code review"}
+          {"id": "board", "label": "Task board", "kind": "accent"},
+          {"id": "coder", "label": "coder", "sub": "writes code"},
+          {"id": "researcher", "label": "researcher", "sub": "finds sources"},
+          {"id": "tester", "label": "tester", "sub": "runs checks"},
+          {"id": "reviewer", "label": "reviewer", "sub": "signs off"}
         ],
-        "edges": ["board -> dev", "board -> uni", "board -> hw", "board -> rev"]
+        "edges": ["board -> coder", "board -> researcher", "board -> tester", "board -> reviewer"]
       }
     },
     {
       "id": "cheap",
       "template": "callout",
-      "narration": "Cloud only when needed. Cron for routine.",
+      "narration": "Big models only when needed. Scripts for routine work.",
       "data": {
         "heading": "Cheap by design",
         "points": [
-          {"title": "Local chat", "text": "Everyday talk costs nothing"},
-          {"title": "Cloud for hard work", "text": "Claude or DeepSeek, only when needed"},
-          {"title": "Cron for routine", "text": "Scripts, zero tokens"}
+          {"title": "Local first", "text": "Everyday requests cost nothing"},
+          {"title": "Big model on demand", "text": "Only for the hard parts"},
+          {"title": "Scheduled scripts", "text": "Routine jobs use no tokens"}
         ]
       }
     },
     {
       "id": "close",
       "template": "callout",
-      "narration": "Shared brain. Results in chat.",
+      "narration": "Shared notes. Results land in chat.",
       "data": {
         "heading": "Shared memory",
-        "text": "One brain, every bot. Results land in chat.",
+        "text": "One knowledge base for every agent.",
         "points": [
-          {"title": "Obsidian vault", "text": "Notes every bot can read"},
+          {"title": "Notes", "text": "Readable by every agent"},
           {"title": "Skills", "text": "Reusable know-how"},
-          {"title": "Chat", "text": "Slack or desktop app"}
+          {"title": "Chat", "text": "Where results arrive"}
         ]
       }
     }

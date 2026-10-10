@@ -1,0 +1,15 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies (no model downloads)
+        run: uv sync
+      - name: Tests (render tests skip themselves without ffmpeg/Chromium)
+        run: uv run pytest -q

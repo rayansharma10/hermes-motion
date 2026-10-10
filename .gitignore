@@ -13,4 +13,3 @@ build/
 *.mp4
 *.part
 !examples/**/*.mp4
-.pytest_cache/
