@@ -41,11 +41,21 @@ def _register_fake():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_user_config(tmp_path_factory, monkeypatch):
+    """Never read the developer's real ~/.config/hermes-motion/config.yaml (results must not
+    depend on the machine)."""
+    empty = tmp_path_factory.mktemp("noconf") / "config.yaml"  # does not exist -> no user layer
+    monkeypatch.setenv("HERMES_MOTION_USER_CONFIG", str(empty))
+    yield
+
+
 @pytest.fixture
-def cfg():
+def cfg(tmp_path):
     c = cfgmod.load_config(project_dir="/nonexistent")
     c["tts"]["chain"] = ["fake"]
     c["pipeline"]["workers"] = 2
+    c["cache_dir"] = str(tmp_path / "cache")
     return c
 
 

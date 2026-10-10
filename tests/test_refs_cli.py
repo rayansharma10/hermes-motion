@@ -43,7 +43,7 @@ def test_style_json_feeds_page_tokens(cfg, tmp_path):
     from hermes_motion import scenes
     style = tmp_path / "style.json"
     style.write_text(json.dumps({"tokens": {"accent": "#00aa55", "bg": "#101010"}}))
-    sb = {"style": {"preset": "clean", "from_reference": str(style), "tokens": {"bg": "#202020"}}}
+    sb = {"style": {"preset": "clean", "from_reference": "style.json", "tokens": {"bg": "#202020"}}}
     tok = scenes.load_tokens(sb, cfg, tmp_path)
     assert tok["accent"] == "#00aa55"   # reference beats preset
     assert tok["bg"] == "#202020"       # storyboard tokens beat reference
