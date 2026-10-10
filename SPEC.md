@@ -47,7 +47,7 @@ Provider interfaces (Python Protocols or JSON-RPC-free plain classes, one file e
 
 ## TTS (default provider chain)
 1. Kokoro-82M via ONNX runtime on CPU (Apache-2.0). Primary: best naturalness for cost. Has multiple voices incl. British/American, male/female.
-2. Piper (MIT) fallback: faster, lighter.
+2. Piper fallback: faster, lighter. NOTE: piper-tts is GPL-3.0-or-later (corrected; see NOTICE.md), not MIT; it is an optional extra.
 3. Windows SAPI via PowerShell as last-resort zero-install fallback (Windows only, robotic).
 - Word-level timestamps: use provider alignment if available, else forced-alignment fallback (e.g. estimate from phoneme/char durations, or a tiny local aligner). Must produce `[{word,start,end}]`.
 - Voice selection from prompt: storyboard carries `voice: {name|accent|gender, speed}`; a voice registry maps descriptive attributes to concrete voices per provider.

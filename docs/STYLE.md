@@ -206,6 +206,9 @@ events, callout points, chart labels, code highlight lines) time each reveal to 
   so the item appears just before the word is spoken.
 - Labels with no match are interpolated evenly between their matched neighbours, so reveals
   follow narration order and never bunch or overlap; the sequence is forced non-decreasing.
+- Limitations: the 4-char prefix rule means "plan" also matches "planet". The search cursor only
+  moves forward, so labels listed out of narration order fall back to interpolation; list labels in
+  the order they are spoken (or set an explicit `cue`).
 - A node's `cue` field (or the explicit labels some templates pass) overrides the search text.
 
 Diagram edges animate relative to their target node: the edge draws starting ~0.45 s before the

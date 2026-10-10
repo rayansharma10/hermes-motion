@@ -58,8 +58,8 @@ A storyboard's `voice.provider` is moved to the front of the chain for that rend
 
 | Key | Type | Default | Meaning |
 |-----|------|---------|---------|
-| `width` | int | `1920` | Output width in pixels. |
-| `height` | int | `1080` | Output height in pixels. |
+| `width` | int | `1920` | Fixed: only 1920 is accepted; any other value is rejected with an error (no scaling yet). |
+| `height` | int | `1080` | Fixed: only 1080 is accepted; any other value is rejected with an error. |
 | `fps` | int | `30` | Frame rate; `24` or `30`. A storyboard's `fps` overrides this. |
 | `scene_lead` | float (s) | `0.15` | Picture before a scene's first spoken word. |
 | `scene_tail` | float (s) | `0.25` | Picture after a scene's last spoken word. |
@@ -72,6 +72,13 @@ A storyboard's `voice.provider` is moved to the front of the chain for that rend
 | `keep_workdir` | bool | `false` | If true, copy the work dir (frames, `index.html`, `timeline.json`) next to the output as `<out>.work/`. |
 | `workers` | int | `3` | Parallel Chromium pages used by the renderer. |
 
+### `security` and `providers`
+
+| Key | Type | Default | Meaning |
+|-----|------|---------|---------|
+| `security.allow_absolute_paths` | bool | `false` | When false, storyboard-referenced files (`custom`, `from_reference`, music, fonts) must live inside the storyboard's folder. Set true to allow absolute paths or `..`. |
+| `providers` | map | `{}` | Extra providers by kind: `{tts: {mytts: "pkg.mod:Class"}}`. |
+
 ### top-level
 
 | Key | Type | Default | Meaning |
@@ -83,12 +90,12 @@ A storyboard's `voice.provider` is moved to the front of the chain for that rend
 | Key | Type | Default | Meaning |
 |-----|------|---------|---------|
 | `chain` | list[str] | `[kokoro, piper, sapi]` | Providers tried in order. |
-| `strict` | bool | *unset* | If true, only the first provider in the (possibly reordered) chain is tried; no fallback. Not present in the shipped config; read by the chain. |
+| `strict` | bool | *unset* | If true, only the first provider in the (possibly reordered) chain is tried; no fallback. Shipped as `false`. An explicit `voice.name`/`voice.provider` that cannot be satisfied is an error rather than a silent substitution. |
 | `voice.accent` | str | `british` | `british`/`american` (aliases: `uk`, `gb`, `english` → british; anything else → american). |
 | `voice.gender` | str | `male` | `male`/`female` (a value starting with `f` → female). |
 | `voice.speed` | float | `1.0` | Speaking rate; per-provider mapping (see below). |
 | `kokoro` | map | `{}` | Reserved for per-provider options. |
-| `piper` | map | `{}` | Reserved. |
+| `piper` | map | `{}` | `allow_unpinned` (bool, default `false`): permit downloading a Piper voice that has no pinned sha256. Off by default; digest-less downloads are refused. |
 | `sapi` | map | `{}` | Reserved. |
 
 A storyboard `voice` object is merged over `tts.voice` for that render. `voice.name` (an exact
@@ -116,6 +123,7 @@ the front of the chain. `speed` maps to Kokoro/Piper directly and to SAPI rate a
 | `crf` | int | `18` | libx264 CRF. For the hardware path this becomes a constant quantiser `min(crf+2, 30)` applied to I/P/B. |
 | `preset` | str | `medium` | libx264 `-preset`. |
 | `audio_bitrate` | str | `192k` | AAC bitrate (48 kHz). |
+| `timeout_seconds` | int | `3600` | Per-ffmpeg-invocation timeout; a hung encode fails and falls back instead of blocking forever. |
 
 ### `captions`
 

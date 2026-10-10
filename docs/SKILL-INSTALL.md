@@ -37,7 +37,7 @@ The Python environment is managed with `uv`. From the checkout:
 
 ```
 uv sync                          # core deps (Playwright, Kokoro, ffmpeg wrapper deps)
-uv sync --extra piper            # optional Piper TTS
+uv sync --extra piper            # optional Piper TTS (piper-tts is GPL-3.0-or-later; see NOTICE.md)
 uv run playwright install chromium
 ```
 

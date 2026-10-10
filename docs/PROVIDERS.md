@@ -23,7 +23,8 @@ class Renderer(Protocol):
 class Encoder(Protocol):
     name: str
     def available(self) -> tuple[bool, str]: ...
-    def encode(self, frames_dir: Path, fps: int, audio: Path | None, out_mp4: Path) -> dict: ...
+    def encode(self, frames_dir: Path, fps: int, audio: Path | None, out_mp4: Path,
+               music: Path | None = None, duration: float | None = None) -> dict: ...
 
 class RefAnalyzer(Protocol):
     name: str
@@ -74,9 +75,9 @@ prov = base.create("tts", "mytts", cfg)             # constructs Class(cfg)
 `create()` imports the module and calls `Class(cfg)` with the whole config dict. Unknown names
 raise `ProviderUnavailable` listing the available ones.
 
-> Note: the module docstring mentions an `hermes_motion.providers` entry-point group, but this
-> version only reads `_REGISTRY`. Register from your own package by calling `base.register()`
-> before the pipeline runs.
+> Note: there is no entry-point mechanism. Providers come from the built-in registry or from the
+> `providers` config key, e.g. `providers: {tts: {mytts: "pkg.mod:Class"}}` (registered before the
+> pipeline runs). From Python you can also call `base.register()` yourself.
 
 ## Adding a TTS provider (worked example)
 
