@@ -5,7 +5,7 @@ html,body{width:var(--W);height:var(--H);overflow:hidden;background:var(--bg);co
 #frame{position:relative;width:var(--W);height:var(--H);overflow:hidden;background:var(--bg)}
 .scene{position:absolute;inset:0;visibility:hidden}
 .stage{position:absolute;left:120px;right:120px;top:90px;bottom:200px;display:flex;flex-direction:column}
-[data-anim]{opacity:0;will-change:transform,opacity}
+[data-anim]{opacity:0}
 h1,h2,h3{font-family:var(--font-head);font-weight:var(--weight-head);letter-spacing:-0.01em;line-height:1.08}
 .kicker{font-size:30px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .heading{font-size:64px;margin-bottom:44px}
