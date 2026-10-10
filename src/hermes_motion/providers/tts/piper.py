@@ -29,9 +29,10 @@ class PiperTTS:
     def _load(self, voice: str):
         if voice not in self._voices:
             from piper import PiperVoice
-            extra = models.piper_urls(voice)
-            onnx = models.ensure(f"{voice}.onnx", self.cache, extra)
-            models.ensure(f"{voice}.onnx.json", self.cache, extra)
+            extra = models.piper_urls(voice)  # validates the voice id
+            unpinned = bool((self.cfg.get("tts", {}).get("piper") or {}).get("allow_unpinned"))
+            onnx = models.ensure(f"{voice}.onnx", self.cache, extra, allow_unpinned=unpinned)
+            models.ensure(f"{voice}.onnx.json", self.cache, extra, allow_unpinned=unpinned)
             self._voices[voice] = PiperVoice.load(str(onnx))
         return self._voices[voice]
 
