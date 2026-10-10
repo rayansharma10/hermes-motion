@@ -31,6 +31,7 @@ class TTSResult:
     voice: str
     sample_rate: int = 24000
     alignment: str = "estimated"  # "native" | "estimated"
+    notes: list[str] = field(default_factory=list)  # warnings for the caller, e.g. a fallback
 
 
 @runtime_checkable

@@ -13,15 +13,28 @@ from . import pipeline, storyboard
 from .providers import base
 
 
+def _utf8_streams() -> None:
+    """Narration may hold arrows/emoji; a piped Windows console defaults to cp1252 and would crash."""
+    for s in (sys.stdout, sys.stderr):
+        reconf = getattr(s, "reconfigure", None)
+        if reconf:
+            try:
+                reconf(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
 def _cfg(args) -> dict:
-    ov = list(args.set or [])
+    over: dict = {}
+    for o in args.set or []:
+        over = cfgmod.deep_merge(over, cfgmod.parse_override(o))
     if getattr(args, "tts", None):
-        ov.append(f"tts.chain=[{args.tts}]")
+        over = cfgmod.deep_merge(over, {"tts": {"chain": [args.tts]}})
     if getattr(args, "fps", None):
-        ov.append(f"video.fps={args.fps}")
+        over = cfgmod.deep_merge(over, {"video": {"fps": args.fps}})
     if getattr(args, "hw", False):
-        ov.append("encoder.hw_encode=true")
-    return cfgmod.load_config(args.config, ov)
+        over = cfgmod.deep_merge(over, {"encoder": {"hw_encode": True}})
+    return cfgmod.load_config(args.config, over)
 
 
 def cmd_doctor(args) -> int:
@@ -32,7 +45,8 @@ def cmd_doctor(args) -> int:
 
 def cmd_validate(args) -> int:
     try:
-        sb = storyboard.load(args.storyboard)
+        allow_abs = bool(_cfg(args).get("security", {}).get("allow_absolute_paths"))
+        sb = storyboard.load(args.storyboard, allow_absolute=allow_abs)
     except storyboard.StoryboardError as e:
         print(str(e), file=sys.stderr)
         return 2
@@ -123,7 +137,16 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_analyze)
 
     args = ap.parse_args(argv)
-    return args.fn(args)
+    _utf8_streams()
+    try:
+        return args.fn(args)
+    except cfgmod.ConfigError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    except OSError as e:
+        print(f"error: cannot read or write {getattr(e, 'filename', None) or 'a file'}: {e.strerror or e}",
+              file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

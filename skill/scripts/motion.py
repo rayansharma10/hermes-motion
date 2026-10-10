@@ -4,6 +4,7 @@
 Locating the checkout (first match wins):
   1. $HERMES_MOTION_HOME
   2. the parent of this skill folder (when skill/ still lives inside the repo)
+Optional extras: set HERMES_MOTION_EXTRAS=piper to also install the Piper TTS fallback.
 Usage: python motion.py <doctor|validate|render|voices|schema|analyze-ref> [args...]
 """
 import os
@@ -28,8 +29,14 @@ def main() -> int:
     uv = shutil.which("uv")
     if not uv:
         sys.exit("uv is required (https://docs.astral.sh/uv/). Install it, then retry.")
-    cmd = [uv, "run", "--project", str(home), "--extra", "piper", "motion", *sys.argv[1:]]
-    return subprocess.call(cmd)
+    cmd = [uv, "run", "--project", str(home)]
+    # Optional extras (e.g. "piper", which is GPL-3.0+) are opt-in: HERMES_MOTION_EXTRAS=piper
+    for extra in filter(None, (x.strip() for x in os.environ.get("HERMES_MOTION_EXTRAS", "").split(","))):
+        cmd += ["--extra", extra]
+    cmd += ["motion", *sys.argv[1:]]
+    # UTF-8 so narration with arrows/emoji cannot crash a cp1252 pipe on Windows
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    return subprocess.call(cmd, env=env)
 
 
 if __name__ == "__main__":

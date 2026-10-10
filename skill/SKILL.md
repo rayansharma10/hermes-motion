@@ -79,3 +79,4 @@ Keep labels short (under 24 characters); at most 5 nodes per diagram column, 6 b
 - No secrets or personal data in storyboards.
 - Output is always 1920x1080, 16:9. Other aspect ratios are not supported.
 - Switch voice engine without editing code: add `--tts piper` (or `sapi`) to `render`.
+  Piper needs the optional extra (GPL-3.0+): set `HERMES_MOTION_EXTRAS=piper` in the environment first.
