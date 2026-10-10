@@ -40,6 +40,7 @@ encoder:
   crf: 18
   preset: medium
   audio_bitrate: 192k
+  timeout_seconds: 3600   # kill ffmpeg if one encode attempt runs longer than this
 captions:
   enabled: true
   position: bottom

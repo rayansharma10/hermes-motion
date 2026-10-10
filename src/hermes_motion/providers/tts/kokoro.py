@@ -46,7 +46,10 @@ class KokoroTTS:
         known = eng.get_voices()
         if voice not in known:
             raise ProviderUnavailable(f"kokoro has no voice {voice!r}; examples: {sorted(known)[:8]}")
-        lang = "en-gb" if voice.startswith("b") else "en-us"
+        try:
+            lang = voices.kokoro_lang(voice)
+        except ValueError as e:
+            raise ProviderUnavailable(str(e)) from None
         speed = float(voice_opts.get("speed", 1.0))
 
         def clause(txt):

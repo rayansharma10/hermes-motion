@@ -36,14 +36,14 @@ def build(sb: dict, results: dict[str, TTSResult | None], fps: int,
                       "end": round(t + lead + w.end, 3)} for w in r.words]
         scenes.append({
             "id": sc["id"], "template": sc["template"], "transition": sc["transition"],
-            "start": round(t, 4), "end": round(t + length, 4), "length": round(length, 4),
-            "audio_offset": round(t + lead, 4) if r else None,
+            "start": round(t, 6), "end": round(t + length, 6), "length": round(length, 6),
+            "audio_offset": round(t + lead, 6) if r else None,
             "narration": sc["narration"], "words": words,
             "narration_start": words[0]["start"] if words else None,
             "narration_end": words[-1]["end"] if words else None,
         })
         t += length
-    return {"fps": fps, "total_seconds": round(t, 4), "total_frames": round(t * fps), "scenes": scenes}
+    return {"fps": fps, "total_seconds": round(t, 6), "total_frames": round(t * fps), "scenes": scenes}
 
 
 def caption_chunks(words: list[dict], max_words: int = 6, max_chars: int = 38) -> list[dict]:

@@ -95,10 +95,26 @@ def names(kind: str) -> list[str]:
 
 
 def create(kind: str, name: str, cfg: dict):
+    """Instantiate a provider. Third-party providers can be declared in config, no code change:
+
+        providers: {tts: {mytts: "pkg.mod:ClassName"}}
+    """
+    extra = (cfg or {}).get("providers") or {}
+    for k, table in extra.items():
+        if not isinstance(table, dict):
+            raise ProviderUnavailable(f"config providers.{k} must map names to 'pkg.mod:Class' strings")
+        for n, target in table.items():
+            if not isinstance(target, str) or ":" not in target:
+                raise ProviderUnavailable(f"config providers.{k}.{n} must look like 'pkg.mod:ClassName'")
+            register(k, n, target)
     try:
         target = _REGISTRY[kind][name]
     except KeyError:
         raise ProviderUnavailable(
             f"unknown {kind} provider {name!r}; available: {names(kind)}") from None
     mod, _, cls = target.partition(":")
-    return getattr(importlib.import_module(mod), cls)(cfg)
+    try:
+        cls_obj = getattr(importlib.import_module(mod), cls)
+    except (ImportError, AttributeError) as e:
+        raise ProviderUnavailable(f"cannot load {kind} provider {name!r} from {target!r}: {e}") from e
+    return cls_obj(cfg)

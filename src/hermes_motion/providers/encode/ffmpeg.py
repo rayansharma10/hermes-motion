@@ -38,6 +38,26 @@ def hw_encoder_works(codec: str = "h264_amf") -> tuple[bool, str]:
     return False, (r.stderr.strip().splitlines() or ["failed"])[-1]
 
 
+def codec_args(codec: str, e: dict) -> list[str]:
+    """Per-codec rate-control arguments. Only libx264 and h264_amf have been run on real hardware
+    by the authors; the others follow each encoder's documented options (UNTESTED here)."""
+    crf = int(e.get("crf", 18))
+    qp = str(min(crf + 2, 30))
+    if codec == "libx264":
+        return ["-c:v", "libx264", "-preset", str(e.get("preset", "medium")), "-crf", str(crf)]
+    if codec == "libx265":
+        return ["-c:v", "libx265", "-preset", str(e.get("preset", "medium")), "-crf", str(crf), "-tag:v", "hvc1"]
+    if codec == "h264_amf":
+        return ["-c:v", codec, "-quality", "quality", "-rc", "cqp", "-qp_i", qp, "-qp_p", qp, "-qp_b", qp]
+    if codec in ("h264_nvenc", "hevc_nvenc"):
+        return ["-c:v", codec, "-preset", "p5", "-rc", "constqp", "-qp", qp]
+    if codec in ("h264_qsv", "hevc_qsv"):
+        return ["-c:v", codec, "-global_quality", qp]
+    if codec in ("h264_videotoolbox", "hevc_videotoolbox"):
+        return ["-c:v", codec, "-q:v", str(max(1, min(100, 100 - crf * 2)))]
+    return ["-c:v", codec]  # unknown encoder: let ffmpeg use its defaults
+
+
 class FfmpegEncoder:
     name = "ffmpeg"
 
@@ -66,17 +86,19 @@ class FfmpegEncoder:
         if music:
             cmd += ["-stream_loop", "-1", "-i", str(music)]
             n_audio += 1
-        if codec == "libx264":
-            cmd += ["-c:v", "libx264", "-preset", str(e.get("preset", "medium")), "-crf", str(e.get("crf", 18))]
-        else:  # hardware encoder: constant quantiser keeps quality predictable
-            qp = str(min(int(e.get("crf", 18)) + 2, 30))
-            cmd += ["-c:v", codec, "-quality", "quality", "-rc", "cqp", "-qp_i", qp, "-qp_p", qp, "-qp_b", qp]
-        cmd += ["-vf", "scale=in_range=full:out_range=limited,format=yuv420p", "-pix_fmt", "yuv420p",
-                "-color_range", "tv", "-r", str(fps), "-movflags", "+faststart"]
+        cmd += codec_args(codec, e)
+        # Frames are full-range sRGB (PNG) or BT.601 JPEG; convert to limited-range BT.709 and tag
+        # it explicitly so every player decodes the same colours for both frame formats.
+        cmd += ["-vf", "scale=in_range=full:in_color_matrix=bt601:out_range=limited:out_color_matrix=bt709,"
+                       "format=yuv420p,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv",
+                "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", "bt709",
+                "-color_primaries", "bt709", "-color_trc", "bt709", "-r", str(fps), "-movflags", "+faststart"]
+        vol = float(self.cfg.get("music", {}).get("volume", 0.12))
         if n_audio == 2:
-            vol = float(self.cfg.get("music", {}).get("volume", 0.12))
             cmd += ["-filter_complex", f"[2:a]volume={vol}[m];[1:a][m]amix=inputs=2:duration=first:normalize=0[a]",
                     "-map", "0:v", "-map", "[a]"]
+        elif n_audio == 1 and music and not audio:  # music only: still honour music.volume
+            cmd += ["-filter_complex", f"[1:a]volume={vol}[a]", "-map", "0:v", "-map", "[a]"]
         elif n_audio == 1:
             cmd += ["-map", "0:v", "-map", "1:a"]
         if n_audio:
@@ -93,6 +115,7 @@ class FfmpegEncoder:
             raise ProviderUnavailable(why)
         out_mp4.parent.mkdir(parents=True, exist_ok=True)
         e = self.cfg["encoder"]
+        timeout = float(e.get("timeout_seconds", 3600)) or None
         tries = []
         if e.get("hw_encode"):
             tries.append(e.get("hw_codec", "h264_amf"))
@@ -101,12 +124,16 @@ class FfmpegEncoder:
             tries.append("libx264")
         errors = []
         for codec in tries:
-            r = subprocess.run(self._cmd(frames_dir, fps, audio, out_mp4, codec, music, duration),
-                               capture_output=True, text=True)
-            if r.returncode == 0:
+            try:
+                r = subprocess.run(self._cmd(frames_dir, fps, audio, out_mp4, codec, music, duration),
+                                   capture_output=True, text=True, timeout=timeout)
+                rc, stderr = r.returncode, r.stderr
+            except subprocess.TimeoutExpired:
+                rc, stderr = -1, f"timed out after {timeout:.0f}s (encoder.timeout_seconds)"
+            if rc == 0:
                 self.used_codec = codec
                 return {"codec": codec, "fallback_errors": errors}
-            msg = (r.stderr.strip().splitlines() or ["unknown ffmpeg error"])[-1]
+            msg = (stderr.strip().splitlines() or ["unknown ffmpeg error"])[-1]
             errors.append(f"{codec}: {msg}")
             log.warning("encoder %s failed (%s); trying next", codec, msg)
         raise ProviderUnavailable("ffmpeg encode failed:\n  - " + "\n  - ".join(errors))

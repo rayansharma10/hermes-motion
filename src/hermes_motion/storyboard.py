@@ -273,6 +273,13 @@ def normalize(raw: dict, base_dir: Path | None = None) -> dict:
 
 def _semantic_checks(sb: dict, base_dir: Path | None, allow_absolute: bool = False) -> list[str]:
     problems = []
+    voice = sb.get("voice")
+    if isinstance(voice, dict) and voice.get("accent") is not None:
+        from .providers.tts import voices as _voices
+        try:
+            _voices.normalize_accent(voice["accent"])
+        except ValueError as e:
+            problems.append(f"voice.accent: {e}")
     style = sb.get("style")
     if isinstance(style, dict):
         try:

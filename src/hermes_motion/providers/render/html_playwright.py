@@ -2,10 +2,30 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
+import threading
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from ..base import ProviderUnavailable
+
+
+def _run_in_thread(fn):
+    """Run a blocking callable on a helper thread (which has no running event loop)."""
+    box: dict = {}
+
+    def target():
+        try:
+            box["value"] = fn()
+        except BaseException as e:  # re-raised in the caller
+            box["error"] = e
+
+    t = threading.Thread(target=target)
+    t.start()
+    t.join()
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
 
 
 def request_allowed(url: str, roots: list[Path]) -> bool:
@@ -30,8 +50,15 @@ class HtmlPlaywrightRenderer:
 
     def __init__(self, cfg: dict):
         self.cfg = cfg
+        self._avail: tuple[bool, str] | None = None
 
     def available(self) -> tuple[bool, str]:
+        if self._avail is not None:  # starting a Playwright driver is slow; ask once per instance
+            return self._avail
+        self._avail = self._check_available()
+        return self._avail
+
+    def _check_available(self) -> tuple[bool, str]:
         try:
             from playwright.sync_api import sync_playwright
         except Exception as e:
@@ -47,12 +74,42 @@ class HtmlPlaywrightRenderer:
 
     def render(self, scene_html: Path, total_seconds: float, fps: int,
                size: tuple[int, int], frames_dir: Path) -> int:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return self._render_sync(scene_html, total_seconds, fps, size, frames_dir)
+        # called from inside a running event loop (notebook, async bot): Playwright's sync API and
+        # asyncio.run both refuse that, so do the whole render on a helper thread
+        return _run_in_thread(lambda: self._render_sync(scene_html, total_seconds, fps, size, frames_dir))
+
+    def _render_sync(self, scene_html: Path, total_seconds: float, fps: int,
+                     size: tuple[int, int], frames_dir: Path) -> int:
         ok, why = self.available()
         if not ok:
             raise ProviderUnavailable(why)
         frames_dir.mkdir(parents=True, exist_ok=True)
         n = int(round(total_seconds * fps))
-        return asyncio.run(self._render(Path(scene_html), n, fps, size, frames_dir))
+        self._check_disk(frames_dir, n)
+        try:
+            return asyncio.run(self._render(Path(scene_html), n, fps, size, frames_dir))
+        except ProviderUnavailable:
+            raise
+        except Exception as e:
+            raise ProviderUnavailable(f"rendering failed: {type(e).__name__}: {e}") from e
+
+    def _check_disk(self, frames_dir: Path, n_frames: int) -> None:
+        rcfg = self.cfg.get("renderer", {})
+        per_frame = 1.5e6 if rcfg.get("frame_format", "jpeg") == "png" else 0.2e6  # conservative lower bounds
+        need = n_frames * per_frame
+        try:
+            free = shutil.disk_usage(frames_dir).free
+        except OSError:
+            return
+        if free < need:
+            raise ProviderUnavailable(
+                f"not enough free disk space for {n_frames} frames in {frames_dir.parent}: need about "
+                f"{need / 1e9:.1f} GB, have {free / 1e9:.1f} GB; free some space or set pipeline.tmp_dir "
+                f"to another drive")
 
     async def _render(self, page_path: Path, n_frames: int, fps: int, size, frames_dir: Path) -> int:
         from playwright.async_api import async_playwright

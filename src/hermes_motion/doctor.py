@@ -48,7 +48,11 @@ def run_checks(cfg: dict, fetch: bool = False, deep: bool = True) -> list[Check]
     out.append(Check("cache dir", "ok", str(cache)))
 
     for name in cfg["tts"].get("chain", []):
-        prov = base.create("tts", name, cfg)
+        try:
+            prov = base.create("tts", name, cfg)
+        except base.ProviderUnavailable as e:
+            out.append(Check(f"tts:{name}", "fail", str(e), "fix tts.chain in your config"))
+            continue
         ok, why = prov.available()
         status = "ok" if ok else "warn"
         fix = ""
@@ -59,12 +63,24 @@ def run_checks(cfg: dict, fetch: bool = False, deep: bool = True) -> list[Check]
         out.append(Check(f"tts:{name}", status, why, fix))
 
     if fetch:
-        for f in ("kokoro-v1.0.onnx", "voices-v1.0.bin", "en_GB-alan-medium.onnx", "en_GB-alan-medium.onnx.json"):
+        from .providers.tts import voices
+        wanted: list[str] = []
+        for name in cfg["tts"].get("chain", []):  # only models for providers the chain actually uses
+            if name == "kokoro":
+                wanted += ["kokoro-v1.0.onnx", "voices-v1.0.bin"]
+            elif name == "piper" and base.create("tts", "piper", cfg).available()[0]:
+                v = voices.pick(voices.PIPER, cfg["tts"].get("voice", {}), "en_GB-alan-medium")
+                wanted += [f"{v}.onnx", f"{v}.onnx.json"]
+        for f in wanted:
+            optional = f.startswith("en_")  # a Piper voice is a fallback: failing to fetch it is a warning
             try:
-                models.ensure(f, cache)
+                unpinned = bool((cfg["tts"].get("piper") or {}).get("allow_unpinned"))
+                models.ensure(f, cache, models.piper_urls(f.rsplit(".onnx", 1)[0]) if optional else None,
+                              allow_unpinned=unpinned)
                 out.append(Check(f"model:{f}", "ok", "present and checksum verified"))
             except base.ProviderUnavailable as e:
-                out.append(Check(f"model:{f}", "fail", str(e), "check your network connection and retry"))
+                out.append(Check(f"model:{f}", "warn" if optional else "fail", str(e),
+                                 "check your network connection and retry"))
 
     if deep and "kokoro" in cfg["tts"].get("chain", []):
         try:
