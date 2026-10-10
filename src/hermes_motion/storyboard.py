@@ -7,11 +7,14 @@ the exact path and what is expected.
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
 
 import jsonschema
+
+from . import paths, tokens as tokenmod
 
 TEMPLATES = [
     "title", "bullets", "diagram", "code", "chart",
@@ -19,6 +22,7 @@ TEMPLATES = [
 ]
 PRESETS = ["clean", "broadcast", "terminal", "editorial", "custom"]
 TRANSITIONS = ["fade", "slide", "cut"]
+AUDIO_SUFFIXES = (".mp3", ".wav", ".ogg", ".m4a", ".flac")
 
 STORYBOARD_SCHEMA: dict = {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -117,22 +121,37 @@ def _as_list(v: Any) -> list:
         return []
     if isinstance(v, str):
         return [s.strip(" -*\u2022") for s in v.splitlines() if s.strip()]
-    return list(v)
+    if isinstance(v, (list, tuple)):
+        return list(v)
+    raise StoryboardError([f"expected a list (or a newline-separated string), got {type(v).__name__}"])
+
+
+def _text_of(i: Any) -> str:
+    if isinstance(i, str):
+        return i
+    if isinstance(i, dict):
+        t = i.get("text") or i.get("label")
+        if isinstance(t, str):
+            return t
+    raise StoryboardError([f"bullet item {i!r} must be a string (or {{\"text\": \"...\"}})"])
 
 
 def _norm_scene_data(template: str, d: dict) -> dict:
     d = dict(d)
     if template == "bullets":
-        d["items"] = [i if isinstance(i, str) else (i.get("text") or i.get("label") or str(i))
-                      for i in _as_list(d.get("items"))]
+        d["items"] = [_text_of(i) for i in _as_list(d.get("items"))]
     elif template == "diagram":
         nodes = []
         for n in _as_list(d.get("nodes")):
             if isinstance(n, str):
                 n = {"id": re.sub(r"\W+", "_", n.lower()).strip("_") or n, "label": n}
+            if not isinstance(n, dict):
+                raise StoryboardError([f"diagram node {n!r} must be a string or {{id, label}} object"])
             n = dict(n)
             n.setdefault("label", n.get("id", ""))
-            n.setdefault("id", re.sub(r"\W+", "_", str(n["label"]).lower()).strip("_"))
+            n["label"] = str(n["label"])
+            n.setdefault("id", re.sub(r"\W+", "_", n["label"].lower()).strip("_"))
+            n["id"] = str(n["id"])
             nodes.append(n)
         ids = {n["id"] for n in nodes}
         by_label = {n["label"].lower(): n["id"] for n in nodes}
@@ -145,6 +164,8 @@ def _norm_scene_data(template: str, d: dict) -> dict:
                 e = {"from": m[0], "to": m[1]}
             elif isinstance(e, (list, tuple)) and len(e) >= 2:
                 e = {"from": e[0], "to": e[1], **({"label": e[2]} if len(e) > 2 else {})}
+            if not isinstance(e, dict):
+                raise StoryboardError([f"diagram edge {e!r} must be 'a -> b', [a, b] or {{from, to}}"])
             e = dict(e)
             if "source" in e:
                 e["from"] = e.pop("source")
@@ -168,11 +189,15 @@ def _norm_scene_data(template: str, d: dict) -> dict:
             s = d.get(side)
             if isinstance(s, dict):
                 s = dict(s)
-                s["items"] = _as_list(s.get("items"))
+                s["items"] = [str(x) for x in _as_list(s.get("items"))]
                 d[side] = s
     elif template == "chart":
         d["labels"] = [str(x) for x in _as_list(d.get("labels"))]
         d["values"] = _as_list(d.get("values"))
+    elif template == "code":
+        hl = d.get("highlight")
+        if isinstance(hl, (int, float)) and not isinstance(hl, bool):
+            d["highlight"] = [hl]
     return d
 
 
@@ -218,22 +243,53 @@ def normalize(raw: dict, base_dir: Path | None = None) -> dict:
         except StoryboardError as e:
             problems.extend(f"{where}: {p}" for p in e.problems)
             continue
+        except (TypeError, AttributeError, ValueError, KeyError) as e:
+            problems.append(f"{where}.data: {type(e).__name__}: {e}; "
+                            f"check the shape of data for template {sc['template']!r}")
+            continue
         sc.setdefault("id", f"s{i + 1}")
-        sc["narration"] = (sc.get("narration") or "").strip()
+        narr = sc.get("narration")
+        if narr is not None and not isinstance(narr, str):
+            problems.append(f"{where}.narration must be a string, got {type(narr).__name__}")
+            continue
+        sc["narration"] = (narr or "").strip()
         sc.setdefault("transition", "fade")
         if not sc["narration"] and not sc.get("min_seconds"):
             sc["min_seconds"] = 3.0
         scenes.append(sc)
     sb["scenes"] = scenes
-    if "fps" in sb and isinstance(sb["fps"], (int, float)):
-        sb["fps"] = int(sb["fps"])
+    if "fps" in sb and isinstance(sb["fps"], (int, float)) and not isinstance(sb["fps"], bool):
+        if float(sb["fps"]).is_integer():
+            sb["fps"] = int(sb["fps"])
+        else:
+            problems.append(f"$.fps: {sb['fps']} is not one of [24, 30]")
+    unknown = sorted(set(sb) - set(STORYBOARD_SCHEMA["properties"]) - {"$schema"})
+    if unknown:
+        problems.append(f"unknown top-level key(s) {unknown}; allowed: {sorted(STORYBOARD_SCHEMA['properties'])}")
     if problems:
         raise StoryboardError(problems)
     return sb
 
 
-def _semantic_checks(sb: dict, base_dir: Path | None) -> list[str]:
+def _semantic_checks(sb: dict, base_dir: Path | None, allow_absolute: bool = False) -> list[str]:
     problems = []
+    style = sb.get("style")
+    if isinstance(style, dict):
+        try:
+            tokenmod.sanitize(style.get("tokens"), "style.tokens")
+        except ValueError as e:
+            problems.append(str(e))
+        if style.get("from_reference"):
+            try:
+                paths.resolve_inside(base_dir, style["from_reference"], (".json",), "style.from_reference",
+                                     allow_absolute=allow_absolute)
+            except paths.PathError as e:
+                problems.append(str(e))
+    if sb.get("music"):
+        try:
+            paths.resolve_inside(base_dir, sb["music"], AUDIO_SUFFIXES, "music", allow_absolute=allow_absolute)
+        except paths.PathError as e:
+            problems.append(str(e))
     seen = set()
     for i, sc in enumerate(sb["scenes"]):
         w = f"scenes[{i}]"
@@ -249,19 +305,38 @@ def _semantic_checks(sb: dict, base_dir: Path | None) -> list[str]:
             ids = {n["id"] for n in d["nodes"]}
             if not d["nodes"]:
                 problems.append(f"{w}.data.nodes must list at least one node ({{id,label}})")
+            if len(ids) != len(d["nodes"]):
+                problems.append(f"{w}.data.nodes has duplicate ids; every node id must be unique "
+                                f"(got {[n['id'] for n in d['nodes']]})")
             for j, e in enumerate(d["edges"]):
                 for end in ("from", "to"):
-                    if e.get(end) not in ids:
+                    v = e.get(end)
+                    if not isinstance(v, str) or v not in ids:
                         problems.append(
-                            f"{w}.data.edges[{j}].{end}={e.get(end)!r} is not a node id; "
+                            f"{w}.data.edges[{j}].{end}={v!r} is not a node id; "
                             f"node ids are {sorted(ids)}")
-        if t == "code" and not d.get("code"):
-            problems.append(f"{w}.data.code must be a non-empty string")
+        if t == "code":
+            if not isinstance(d.get("code"), str) or not d.get("code"):
+                problems.append(f"{w}.data.code must be a non-empty string")
+            else:
+                n_lines = len(d["code"].rstrip("\n").split("\n"))
+                hl = d.get("highlight", [])
+                if not isinstance(hl, list) or not all(
+                        isinstance(x, (int, float)) and not isinstance(x, bool)
+                        and float(x).is_integer() and 1 <= x <= n_lines for x in hl):
+                    problems.append(f"{w}.data.highlight must be a list of line numbers between 1 and {n_lines}")
+                else:
+                    d["highlight"] = [int(x) for x in hl]
         if t == "chart":
             if len(d["labels"]) != len(d["values"]) or not d["values"]:
                 problems.append(f"{w}.data.labels and values must be equal-length, non-empty lists")
-            elif not all(isinstance(v, (int, float)) for v in d["values"]):
-                problems.append(f"{w}.data.values must all be numbers")
+            elif not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+                         for v in d["values"]):
+                problems.append(f"{w}.data.values must all be finite numbers")
+            elif any(v < 0 for v in d["values"]):
+                problems.append(f"{w}.data.values must not be negative")
+            elif d.get("type", "bar") not in ("bar", "line"):
+                problems.append(f"{w}.data.type must be 'bar' or 'line'")
         if t == "comparison":
             for side in ("left", "right"):
                 if not isinstance(d.get(side), dict) or not d[side].get("items"):
@@ -272,14 +347,18 @@ def _semantic_checks(sb: dict, base_dir: Path | None) -> list[str]:
             problems.append(f"{w}.data needs 'text' and/or 'points'")
         if t == "custom":
             html = d.get("html")
-            if not html:
-                problems.append(f"{w}.data.html must be a path to an HTML file")
-            elif base_dir is not None and not (Path(base_dir) / html).exists():
-                problems.append(f"{w}.data.html file not found: {html} (relative to the storyboard)")
+            if not html or not isinstance(html, str):
+                problems.append(f"{w}.data.html must be a path (string) to an HTML file")
+            else:
+                try:
+                    paths.resolve_inside(base_dir, html, (".html", ".htm"), what=f"{w}.data.html",
+                                         allow_absolute=allow_absolute)
+                except paths.PathError as e:
+                    problems.append(str(e))
     return problems
 
 
-def validate(raw: dict, base_dir: Path | None = None) -> dict:
+def validate(raw: dict, base_dir: Path | None = None, allow_absolute: bool = False) -> dict:
     """Normalise then validate. Returns the clean storyboard or raises StoryboardError."""
     sb = normalize(raw, base_dir)
     validator = jsonschema.Draft7Validator(STORYBOARD_SCHEMA)
@@ -287,16 +366,26 @@ def validate(raw: dict, base_dir: Path | None = None) -> dict:
     for err in sorted(validator.iter_errors(sb), key=lambda e: list(e.absolute_path)):
         path = "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in err.absolute_path)
         problems.append(f"${path}: {err.message}")
-    problems += _semantic_checks(sb, base_dir)
+    try:
+        problems += _semantic_checks(sb, base_dir, allow_absolute)
+    except (TypeError, AttributeError, KeyError, ValueError) as e:
+        if not problems:  # otherwise the schema errors above already explain it
+            problems.append(f"{type(e).__name__}: {e}; check the shape of the storyboard")
     if problems:
         raise StoryboardError(problems)
     return sb
 
 
-def load(path: str | Path) -> dict:
+def load(path: str | Path, allow_absolute: bool = False) -> dict:
     p = Path(path)
     try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
+        text = p.read_text(encoding="utf-8-sig")  # tolerate the BOM PowerShell writes
+    except FileNotFoundError:
+        raise StoryboardError([f"cannot read {p}: file not found"]) from None
+    except (OSError, UnicodeDecodeError) as e:
+        raise StoryboardError([f"cannot read {p}: {e}"]) from e
+    try:
+        raw = json.loads(text)
     except json.JSONDecodeError as e:
         raise StoryboardError([f"{p.name} is not valid JSON: {e}"]) from e
-    return validate(raw, p.parent)
+    return validate(raw, p.resolve().parent, allow_absolute)

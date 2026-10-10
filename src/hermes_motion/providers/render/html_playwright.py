@@ -3,8 +3,26 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from ..base import ProviderUnavailable
+
+
+def request_allowed(url: str, roots: list[Path]) -> bool:
+    """True for data: URLs and for file: URLs inside one of ``roots``; everything else is blocked."""
+    u = urlparse(url)
+    if u.scheme in ("data", "about", "blob"):
+        return True
+    if u.scheme != "file":
+        return False
+    path = unquote(u.path)
+    if len(path) > 2 and path[0] == "/" and path[2] == ":":  # file:///C:/x on Windows
+        path = path[1:]
+    try:
+        p = Path(path).resolve()
+    except (OSError, ValueError):
+        return False
+    return any(p == r or r in p.parents for r in roots)
 
 
 class HtmlPlaywrightRenderer:
@@ -44,6 +62,9 @@ class HtmlPlaywrightRenderer:
         workers = max(1, int(self.cfg.get("pipeline", {}).get("workers", 3)))
         workers = min(workers, n_frames) or 1
         url = page_path.resolve().as_uri()
+        allowed_roots = [page_path.resolve().parent]
+        if rcfg.get("fonts_dir"):
+            allowed_roots.append(Path(rcfg["fonts_dir"]).expanduser().resolve())
         shot_opts = {"type": fmt}
         if fmt == "jpeg":
             shot_opts["quality"] = int(rcfg.get("jpeg_quality", 95))
@@ -54,6 +75,10 @@ class HtmlPlaywrightRenderer:
             async def worker(idx: int):
                 ctx = await browser.new_context(viewport={"width": size[0], "height": size[1]},
                                                 device_scale_factor=1)
+                # Scenes may contain untrusted `custom` HTML: no network, no local files except
+                # the page's own folder (and the configured fonts folder).
+                await ctx.route("**/*", lambda route: route.continue_()
+                                if request_allowed(route.request.url, allowed_roots) else route.abort())
                 page = await ctx.new_page()
                 await page.goto(url)
                 await page.evaluate("window.__ready")

@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from . import config as cfgmod
-from . import scenes, storyboard, timeline
+from . import paths, scenes, storyboard, timeline
 from .providers import base
 from .providers.tts import chain
 
@@ -23,13 +23,12 @@ def _say(msg: str, quiet: bool) -> None:
 
 def _find_music(sb: dict, cfg: dict, base_dir: Path | None) -> Path | None:
     m = sb.get("music")
+    allow_abs = bool(cfg.get("security", {}).get("allow_absolute_paths"))
     if m:
-        p = Path(m)
-        if not p.is_absolute() and base_dir:
-            p = base_dir / p
-        if not p.exists():
-            raise storyboard.StoryboardError([f"music file not found: {m}"])
-        return p
+        try:
+            return paths.resolve_inside(base_dir, m, storyboard.AUDIO_SUFFIXES, "music", allow_absolute=allow_abs)
+        except paths.PathError as e:
+            raise storyboard.StoryboardError([str(e)]) from None
     mc = cfg.get("music", {})
     if mc.get("enabled") and mc.get("folder"):
         files = sorted(p for p in Path(mc["folder"]).expanduser().glob("*")
@@ -42,21 +41,30 @@ def render(storyboard_path: str | Path | dict, out_mp4: str | Path, cfg: dict | 
            quiet: bool = False) -> dict:
     """Render a storyboard to MP4. Returns a dict with paths, timings and the timing report."""
     t_start = time.time()
-    cfg = cfg or cfgmod.load_config()
+    cfg = cfgmod.load_config() if cfg is None else cfgmod.deep_merge(cfgmod.default_config(), cfg)  # copy, never mutate
+    allow_abs = bool(cfg.get("security", {}).get("allow_absolute_paths"))
     base_dir = None
     if isinstance(storyboard_path, dict):
-        sb = storyboard.validate(storyboard_path)
+        sb = storyboard.validate(storyboard_path, allow_absolute=allow_abs)
     else:
         base_dir = Path(storyboard_path).resolve().parent
-        sb = storyboard.load(storyboard_path)
+        sb = storyboard.load(storyboard_path, allow_absolute=allow_abs)
     fps = int(sb.get("fps") or cfg["video"]["fps"])
     cfg["video"]["fps"] = fps
+    v = cfg["video"]
+    if (v.get("width"), v.get("height")) != (1920, 1080):
+        raise cfgmod.ConfigError(
+            f"video.width/height is {v.get('width')}x{v.get('height')}, but only 1920x1080 is supported "
+            f"(the scene layouts are fixed for 1080p); remove those keys or set 1920x1080")
     out_mp4 = Path(out_mp4)
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
 
     tmp_root = cfg["pipeline"].get("tmp_dir")
-    work = Path(tempfile.mkdtemp(prefix="hm-", dir=tmp_root))
+    if tmp_root:
+        tmp_root = str(Path(tmp_root).expanduser())
+        Path(tmp_root).mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="hm-", dir=tmp_root or None))
     try:
         # 1. narration first: audio + word timings drive everything else
         voice = {**cfg["tts"].get("voice", {}), **(sb.get("voice") or {})}
@@ -69,6 +77,10 @@ def render(storyboard_path: str | Path | dict, out_mp4: str | Path, cfg: dict | 
             results[sc["id"]] = chain.synthesize(sc["narration"], voice, work / f"{sc['id']}.wav", cfg)
         used = sorted({r.provider + ":" + r.voice for r in results.values() if r})
         _say(f"[tts] voice(s): {', '.join(used) or 'none (silent)'}", quiet)
+        for r in results.values():
+            for note in (r.notes if r else []):
+                if note not in warnings:
+                    warnings.append(note)
 
         # 2. timeline from word timings
         v = cfg["video"]

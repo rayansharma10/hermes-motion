@@ -65,13 +65,59 @@ def default_config() -> dict:
     raise FileNotFoundError("default motion.config.yaml not found")
 
 
+class ConfigError(ValueError):
+    """The merged configuration is invalid; the message says which key and what is expected."""
+
+
+def _unknown_keys(cfg: dict, default: dict, prefix: str = "") -> list[str]:
+    bad = []
+    for k, v in cfg.items():
+        path = f"{prefix}{k}"
+        if k not in default:
+            bad.append(path)
+        elif isinstance(v, dict) and isinstance(default[k], dict) and default[k]:
+            bad += _unknown_keys(v, default[k], path + ".")
+    return bad
+
+
+def validate_config(cfg: dict) -> dict:
+    """Check shapes and reject unknown keys (typos). Returns cfg with small normalisations."""
+    problems: list[str] = []
+    unknown = _unknown_keys(cfg, default_config())
+    if unknown:
+        problems.append(f"unknown config key(s): {unknown}")
+    tts = cfg.get("tts") or {}
+    chain = tts.get("chain")
+    if isinstance(chain, str):
+        chain = tts["chain"] = [chain]
+    if not isinstance(chain, list) or not chain or not all(isinstance(c, str) for c in chain):
+        problems.append("tts.chain must be a non-empty list of provider names, e.g. [kokoro, piper, sapi]")
+    fps = (cfg.get("video") or {}).get("fps")
+    if fps not in (24, 30):
+        problems.append(f"video.fps must be 24 or 30, got {fps!r}")
+    for key, section in (("pipeline.workers", "pipeline"), ("renderer.jpeg_quality", "renderer")):
+        name = key.split(".")[1]
+        val = (cfg.get(section) or {}).get(name)
+        if isinstance(val, bool) or not isinstance(val, int) or val < 1:
+            problems.append(f"{key} must be a positive integer, got {val!r}")
+    if problems:
+        raise ConfigError("Invalid config:\n  - " + "\n  - ".join(problems))
+    return cfg
+
+
+def user_config_path() -> Path:
+    """~/.config/hermes-motion/config.yaml, or $HERMES_MOTION_USER_CONFIG when set (tests use this)."""
+    env = os.environ.get("HERMES_MOTION_USER_CONFIG")
+    return Path(env) if env else Path.home() / ".config" / "hermes-motion" / "config.yaml"
+
+
 def load_config(
     config_file: str | os.PathLike | None = None,
     overrides: list[str] | dict | None = None,
     project_dir: str | os.PathLike | None = None,
 ) -> dict:
     cfg = default_config()
-    user = Path.home() / ".config" / "hermes-motion" / "config.yaml"
+    user = user_config_path()
     if user.exists():
         cfg = deep_merge(cfg, _load_yaml(user))
     proj = Path(project_dir or Path.cwd()) / "motion.config.yaml"
@@ -84,7 +130,7 @@ def load_config(
     else:
         for o in overrides or []:
             cfg = deep_merge(cfg, parse_override(o))
-    return cfg
+    return validate_config(cfg)
 
 
 def cache_dir(cfg: dict) -> Path:

@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 
 from . import config as cfgmod
+from . import paths, tokens as tokenmod
+from .storyboard import StoryboardError
 from .timeline import caption_chunks, cue_times
 
 W, H = 1920, 1080
@@ -29,12 +31,13 @@ def A(kind: str, t: float, d: float = 0.6) -> str:
 class Ctx:
     """Per-scene helper passed to template builders."""
 
-    def __init__(self, scene: dict, base_dir: Path | None):
+    def __init__(self, scene: dict, base_dir: Path | None, allow_absolute: bool = False):
         self.scene = scene
         self.words = scene["words"]
         self.start = scene["start"]
         self.length = scene["length"]
         self.base_dir = base_dir
+        self.allow_absolute = allow_absolute
 
     def cues(self, labels: list[str], explicit: list | None = None) -> list[float]:
         return cue_times(labels, self.words, self.start, self.length, explicit=explicit)
@@ -292,10 +295,12 @@ def tpl_callout(d, c: Ctx) -> str:
 
 # ----------------------------------------------------------------------------- custom
 def tpl_custom(d, c: Ctx) -> str:
-    p = Path(d["html"])
-    if not p.is_absolute() and c.base_dir:
-        p = c.base_dir / p
-    return f'<div class="stage tpl-custom" style="inset:0;left:0;right:0;top:0;bottom:0">{p.read_text(encoding="utf-8")}</div>'
+    try:
+        p = paths.resolve_inside(c.base_dir, d["html"], (".html", ".htm"), "custom html",
+                                 allow_absolute=c.allow_absolute)
+    except paths.PathError as e:
+        raise StoryboardError([str(e)]) from None
+    return f'<div class="stage tpl-custom" style="inset:0;left:0;right:0;top:0;bottom:0">{p.read_text(encoding="utf-8-sig")}</div>'
 
 
 BUILDERS = {
@@ -307,21 +312,33 @@ BUILDERS = {
 
 # ----------------------------------------------------------------------------- tokens & page
 def load_tokens(sb: dict, cfg: dict, base_dir: Path | None) -> dict:
-    """preset < config style.tokens < reference style.json < storyboard style.tokens."""
+    """preset < config style.tokens < reference style.json < storyboard style.tokens.
+
+    Every layer except the shipped preset is sanitised: tokens are pasted into <style>/<script>.
+    """
     rt = cfgmod.runtime_dir()
+    allow_abs = bool(cfg.get("security", {}).get("allow_absolute_paths"))
     style = {**(cfg.get("style") or {}), **(sb.get("style") or {})}
     preset = style.get("preset") or "clean"
     if preset == "custom":
         preset = "clean"
     tokens = json.loads((rt / "styles" / f"{preset}.json").read_text(encoding="utf-8"))
-    tokens.update((cfg.get("style") or {}).get("tokens") or {})
-    ref = style.get("from_reference") or (cfg.get("style") or {}).get("from_reference")
-    if ref:
-        rp = Path(ref)
-        if not rp.is_absolute() and base_dir:
-            rp = base_dir / rp
-        tokens.update(json.loads(rp.read_text(encoding="utf-8")).get("tokens", {}))
-    tokens.update((sb.get("style") or {}).get("tokens") or {})
+    try:
+        tokens.update(tokenmod.sanitize((cfg.get("style") or {}).get("tokens"), "config style.tokens"))
+        ref = style.get("from_reference") or (cfg.get("style") or {}).get("from_reference")
+        if ref:
+            try:
+                rp = paths.resolve_inside(base_dir, ref, (".json",), "style.from_reference",
+                                          allow_absolute=allow_abs)
+            except paths.PathError as e:
+                raise StoryboardError([str(e)]) from None
+            ref_tokens = json.loads(rp.read_text(encoding="utf-8-sig")).get("tokens", {})
+            tokens.update(tokenmod.sanitize(ref_tokens, "from_reference tokens"))
+        tokens.update(tokenmod.sanitize((sb.get("style") or {}).get("tokens"), "style.tokens"))
+    except ValueError as e:
+        if isinstance(e, StoryboardError):
+            raise
+        raise StoryboardError([str(e)]) from None
     return tokens
 
 
@@ -331,7 +348,8 @@ def _font_faces(fonts_dir: str | None) -> str:
     out = []
     for f in sorted(Path(fonts_dir).expanduser().glob("*")):
         if f.suffix.lower() in (".ttf", ".otf", ".woff", ".woff2"):
-            out.append(f'@font-face{{font-family:"{f.stem}";src:url("{f.resolve().as_uri()}")}}')
+            fam = re.sub(r"[^A-Za-z0-9 _-]", "_", f.stem)  # file names are not trusted CSS
+            out.append(f'@font-face{{font-family:"{fam}";src:url("{f.resolve().as_uri()}")}}')
     return "\n".join(out)
 
 
@@ -350,8 +368,9 @@ def build_page(sb: dict, timeline: dict, tokens: dict, cfg: dict, base_dir: Path
     root = ";".join(f"{k}:{v}" for k, v in css_vars.items())
     scenes_html = []
     all_words = []
+    allow_abs = bool(cfg.get("security", {}).get("allow_absolute_paths"))
     for sc, tl in zip(sb["scenes"], timeline["scenes"]):
-        ctx = Ctx(tl, base_dir)
+        ctx = Ctx(tl, base_dir, allow_abs)
         body = BUILDERS[sc["template"]](sc["data"], ctx)
         scenes_html.append(
             f'<section class="scene" id="sc-{esc(sc["id"])}" data-start="{tl["start"]}" data-end="{tl["end"]}" '
@@ -368,7 +387,8 @@ def build_page(sb: dict, timeline: dict, tokens: dict, cfg: dict, base_dir: Path
                          for w in ch["words"])
             caps_html += f'<div class="cap{hl}" data-start="{ch["start"]:.3f}" data-end="{ch["end"]:.3f}">{ws}</div>'
     pos = "top" if capcfg.get("position") == "top" else ""
-    runtime_cfg = json.dumps({"easing": tokens.get("easing", "smooth"), "intensity": tokens.get("intensity", 1.0)})
+    runtime_cfg = json.dumps({"easing": tokens.get("easing", "smooth"), "intensity": float(tokens.get("intensity", 1.0))})
+    runtime_cfg = runtime_cfg.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     css = (rt / "base.css").read_text(encoding="utf-8")
     js = (rt / "motion.js").read_text(encoding="utf-8")
     fonts = _font_faces(cfg.get("renderer", {}).get("fonts_dir"))

@@ -3,7 +3,7 @@
 #   < --config FILE < --set key=value flags / function arguments
 # Every key is documented in docs/CONFIG.md.
 video:
-  width: 1920
+  width: 1920        # fixed: only 1920x1080 is supported, other values are rejected at render
   height: 1080
   fps: 30            # 24 or 30
   scene_lead: 0.15   # seconds of picture before a scene's first word
@@ -13,6 +13,9 @@ pipeline:
   keep_workdir: false
   workers: 3         # parallel browser pages used by the renderer
 cache_dir: null      # null -> ~/.cache/hermes-motion (models are downloaded here)
+security:
+  allow_absolute_paths: false   # true -> storyboards may name files outside their own folder
+providers: {}                   # extra providers: {tts: {mytts: "pkg.mod:Class"}}
 tts:
   chain: [kokoro, piper, sapi]   # tried in order; first that works wins
   strict: false      # true -> never fall back past the first provider
@@ -21,7 +24,8 @@ tts:
     gender: male
     speed: 1.0
   kokoro: {}
-  piper: {}
+  piper:
+    allow_unpinned: false   # true -> allow Piper voices that have no pinned sha256 (not recommended)
   sapi: {}
 renderer:
   provider: html-playwright
