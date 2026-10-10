@@ -1,0 +1,10 @@
+{
+  "name": "clean",
+  "bg": "#f6f4ef", "fg": "#1e2024", "muted": "#6b6f76", "accent": "#d9480f", "accent2": "#1e2024",
+  "surface": "#ffffff", "line": "#d8d5cc", "on_accent": "#ffffff",
+  "font_head": "\"Segoe UI Variable Display\", \"Segoe UI\", Inter, \"Helvetica Neue\", Arial, system-ui, sans-serif",
+  "font_body": "\"Segoe UI Variable Text\", \"Segoe UI\", Inter, \"Helvetica Neue\", Arial, system-ui, sans-serif",
+  "font_mono": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "weight_head": 700, "radius": 14, "easing": "smooth", "intensity": 1.0, "density": "medium",
+  "caption_bg": "rgba(30,32,36,0.88)", "caption_fg": "#ffffff"
+}

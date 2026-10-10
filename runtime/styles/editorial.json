@@ -1,0 +1,10 @@
+{
+  "name": "editorial",
+  "bg": "#fbf8f1", "fg": "#201d1a", "muted": "#7a746b", "accent": "#b3261e", "accent2": "#201d1a",
+  "surface": "#ffffff", "line": "#ddd6c8", "on_accent": "#ffffff",
+  "font_head": "Georgia, \"Iowan Old Style\", \"Palatino Linotype\", \"Times New Roman\", serif",
+  "font_body": "\"Segoe UI\", Inter, \"Helvetica Neue\", Arial, system-ui, sans-serif",
+  "font_mono": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "weight_head": 700, "radius": 2, "easing": "inout", "intensity": 0.8, "density": "low",
+  "caption_bg": "rgba(32,29,26,0.9)", "caption_fg": "#fbf8f1"
+}

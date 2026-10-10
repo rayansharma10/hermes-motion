@@ -1,0 +1,4 @@
+# Swap the voice engine with config alone: render with  motion render <sb> --config examples/piper.config.yaml
+tts:
+  chain: [piper]
+  strict: true

@@ -1,0 +1,10 @@
+{
+  "name": "broadcast",
+  "bg": "#101623", "fg": "#f1f4f9", "muted": "#9aa6bb", "accent": "#ffb000", "accent2": "#f1f4f9",
+  "surface": "#1a2335", "line": "#2c3a55", "on_accent": "#101623",
+  "font_head": "\"Segoe UI Variable Display\", \"Segoe UI\", Inter, \"Helvetica Neue\", Arial, system-ui, sans-serif",
+  "font_body": "\"Segoe UI Variable Text\", \"Segoe UI\", Inter, \"Helvetica Neue\", Arial, system-ui, sans-serif",
+  "font_mono": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "weight_head": 800, "radius": 8, "easing": "snappy", "intensity": 1.3, "density": "high",
+  "caption_bg": "rgba(0,0,0,0.65)", "caption_fg": "#ffffff"
+}

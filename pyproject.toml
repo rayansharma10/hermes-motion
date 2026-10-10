@@ -1,0 +1,39 @@
+[project]
+name = "hermes-motion"
+version = "0.1.0"
+description = "Prompt-in, MP4-out narrated explainer videos: deterministic HTML scenes, local TTS, ffmpeg."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "playwright>=1.45",
+  "pyyaml>=6",
+  "numpy>=1.26",
+  "onnxruntime>=1.18",
+  "kokoro-onnx>=0.4",
+  "soundfile>=0.12",
+  "jsonschema>=4",
+]
+
+[project.optional-dependencies]
+piper = ["piper-tts>=1.2"]
+
+[project.scripts]
+motion = "hermes_motion.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hermes_motion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"runtime" = "hermes_motion/runtime"
+"motion.config.yaml" = "hermes_motion/motion.config.yaml"

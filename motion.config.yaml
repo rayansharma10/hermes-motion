@@ -1,0 +1,54 @@
+# hermes-motion default configuration. Layering (later wins):
+#   built-in defaults < ~/.config/hermes-motion/config.yaml < ./motion.config.yaml
+#   < --config FILE < --set key=value flags / function arguments
+# Every key is documented in docs/CONFIG.md.
+video:
+  width: 1920
+  height: 1080
+  fps: 30            # 24 or 30
+  scene_lead: 0.15   # seconds of picture before a scene's first word
+  scene_tail: 0.25   # seconds of picture after a scene's last word
+pipeline:
+  tmp_dir: null      # null -> system temp
+  keep_workdir: false
+  workers: 3         # parallel browser pages used by the renderer
+cache_dir: null      # null -> ~/.cache/hermes-motion (models are downloaded here)
+tts:
+  chain: [kokoro, piper, sapi]   # tried in order; first that works wins
+  strict: false      # true -> never fall back past the first provider
+  voice:
+    accent: british
+    gender: male
+    speed: 1.0
+  kokoro: {}
+  piper: {}
+  sapi: {}
+renderer:
+  provider: html-playwright
+  frame_format: jpeg   # jpeg (fast) or png (lossless)
+  jpeg_quality: 95
+  fonts_dir: null      # folder of .ttf/.otf/.woff2 files, loaded as @font-face
+encoder:
+  provider: ffmpeg
+  codec: libx264
+  hw_encode: false     # true -> try h264_amf (AMD) first, fall back to libx264
+  hw_codec: h264_amf
+  crf: 18
+  preset: medium
+  audio_bitrate: 192k
+captions:
+  enabled: true
+  position: bottom
+  highlight_words: true
+music:
+  enabled: false
+  folder: null
+  volume: 0.12
+style:
+  preset: clean
+  tokens: {}
+  from_reference: null
+refs:
+  provider: basic
+  sample_frames: 24
+  scene_threshold: 0.3

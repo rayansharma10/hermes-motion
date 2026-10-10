@@ -1,0 +1,97 @@
+/* hermes-motion base stylesheet. Everything is driven by CSS variables set from the style tokens. */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:var(--W);height:var(--H);overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+#frame{position:relative;width:var(--W);height:var(--H);overflow:hidden;background:var(--bg)}
+.scene{position:absolute;inset:0;visibility:hidden}
+.stage{position:absolute;left:120px;right:120px;top:90px;bottom:200px;display:flex;flex-direction:column}
+[data-anim]{opacity:0;will-change:transform,opacity}
+h1,h2,h3{font-family:var(--font-head);font-weight:var(--weight-head);letter-spacing:-0.01em;line-height:1.08}
+.kicker{font-size:30px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.heading{font-size:64px;margin-bottom:44px}
+.sub{font-size:44px;color:var(--muted);line-height:1.3}
+.muted{color:var(--muted)}
+.bar{height:10px;width:160px;background:var(--accent);border-radius:5px}
+
+/* title */
+.tpl-title{justify-content:center;gap:28px}
+.tpl-title h1{font-size:120px;max-width:1500px}
+
+/* bullets */
+.tpl-bullets ul{list-style:none;display:flex;flex-direction:column;gap:30px}
+.tpl-bullets li{display:flex;align-items:flex-start;gap:28px;font-size:52px;line-height:1.25;max-width:1550px}
+.tpl-bullets li::before{content:"";flex:none;width:18px;height:18px;margin-top:22px;border-radius:50%;background:var(--accent)}
+
+/* diagram */
+.tpl-diagram .canvas{position:relative;flex:1}
+.node{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  background:var(--surface);border:3px solid var(--line);border-radius:var(--radius);padding:10px 18px}
+.node .nl{font-size:50px;font-weight:700;font-family:var(--font-head);line-height:1.1}
+.node .ns{font-size:30px;color:var(--muted);margin-top:6px;line-height:1.15}
+.node.accent{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.node.accent .ns{color:var(--on-accent);opacity:.85}
+.node.muted{background:transparent;border-style:dashed;color:var(--muted)}
+.edges{position:absolute;inset:0;overflow:visible}
+.edge{fill:none;stroke:var(--fg);stroke-width:4;stroke-linecap:round}
+.flow{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;stroke-dasharray:1 30}
+.elabel{position:absolute;font-size:30px;color:var(--muted);background:var(--bg);padding:2px 10px;transform:translate(-50%,-50%)}
+
+/* code */
+.tpl-code .win{background:#16181d;color:#e6e8ee;border-radius:var(--radius);padding:30px 0;font-family:var(--font-mono);
+  font-size:34px;line-height:1.55;box-shadow:0 2px 0 rgba(0,0,0,.08)}
+.tpl-code .lang{align-self:flex-end;font-size:24px;color:var(--muted);margin-bottom:10px;font-family:var(--font-mono)}
+.cl{display:flex;padding:0 36px;white-space:pre;position:relative}
+.cl::before{content:"";position:absolute;inset:0;background:var(--accent);opacity:calc(var(--hl,0)*.28)}
+.cl::after{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent);opacity:var(--hl,0)}
+.cl .ln{width:64px;flex:none;color:#6c7280;text-align:right;padding-right:28px;position:relative}
+.cl .tx{position:relative}
+.tk-c{color:#7d8696}.tk-s{color:#a5d6a7}.tk-n{color:#ffcc80}.tk-k{color:#ff9e80}
+
+/* chart */
+.tpl-chart svg{flex:1;width:100%}
+.tpl-chart text{font-family:var(--font-body);fill:var(--fg)}
+.chart-axis{stroke:var(--line);stroke-width:2}
+
+/* comparison */
+.tpl-comparison .cols{display:flex;gap:56px;flex:1}
+.tpl-comparison .col{flex:1;background:var(--surface);border:3px solid var(--line);border-radius:var(--radius);padding:40px 48px}
+.tpl-comparison .col.r{border-color:var(--accent)}
+.tpl-comparison h3{font-size:48px;margin-bottom:28px}
+.tpl-comparison .col.r h3{color:var(--accent)}
+.tpl-comparison li{list-style:none;font-size:38px;line-height:1.3;margin-bottom:20px;padding-left:34px;position:relative}
+.tpl-comparison li::before{content:"";position:absolute;left:0;top:18px;width:14px;height:14px;border-radius:50%;background:var(--muted)}
+.tpl-comparison .col.r li::before{background:var(--accent)}
+
+/* timeline */
+.tpl-timeline .tl{position:relative;flex:1}
+.tl-line{position:absolute;left:0;right:0;top:50%;height:6px;background:var(--line);border-radius:3px}
+.tl-fill{position:absolute;left:0;right:0;top:50%;height:6px;background:var(--accent);border-radius:3px}
+.tl-dot{position:absolute;top:50%;width:34px;height:34px;margin:-14px 0 0 -17px;border-radius:50%;background:var(--accent);border:6px solid var(--bg)}
+.tl-ev{position:absolute;width:320px;margin-left:-160px;text-align:center}
+.tl-ev .l{font-size:38px;font-weight:700;font-family:var(--font-head)}
+.tl-ev .d{font-size:28px;color:var(--muted);margin-top:6px;line-height:1.2}
+
+/* callout */
+.tpl-callout{justify-content:center;gap:44px}
+.tpl-callout .statement{font-family:var(--font-head);font-weight:var(--weight-head);font-size:84px;line-height:1.1;
+  border-left:14px solid var(--accent);padding-left:44px;max-width:1500px}
+.tpl-callout .points{display:flex;gap:32px}
+.tpl-callout .pt{flex:1;background:var(--surface);border:3px solid var(--line);border-radius:var(--radius);padding:30px 34px}
+.tpl-callout .pt .pn{font-size:24px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.tpl-callout .pt .pt-t{font-size:46px;font-weight:700;font-family:var(--font-head);line-height:1.12}
+.tpl-callout .pt .pt-x{font-size:34px;color:var(--muted);margin-top:10px;line-height:1.25}
+
+/* captions (burned in) */
+#captions{position:absolute;left:0;right:0;bottom:56px;display:flex;justify-content:center;pointer-events:none}
+#captions.top{bottom:auto;top:56px}
+.cap{display:none;background:var(--caption-bg);color:var(--caption-fg);font-size:46px;font-weight:600;line-height:1.25;
+  padding:14px 34px 16px;border-radius:12px;max-width:1680px;text-align:center;font-family:var(--font-body)}
+.cap .w{opacity:.62}
+.cap.hl .w.done{opacity:.85}
+.cap.hl .w.on{opacity:1;color:var(--cap-hl,#ffd9a8)}
+.cap:not(.hl) .w{opacity:1}
+
+/* svg transforms pivot on the element itself */
+svg [data-anim]{transform-box:fill-box;transform-origin:center}
+
+h1,.heading,.statement,.sub,.pt-t,.pt-x,.cap{text-wrap:balance}

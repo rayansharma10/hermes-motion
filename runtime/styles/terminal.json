@@ -1,0 +1,10 @@
+{
+  "name": "terminal",
+  "bg": "#0c0f0d", "fg": "#d7e4d9", "muted": "#7f9585", "accent": "#5bd68a", "accent2": "#d7e4d9",
+  "surface": "#141a16", "line": "#27352b", "on_accent": "#0c0f0d",
+  "font_head": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "font_body": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "font_mono": "\"Cascadia Mono\", Consolas, \"SF Mono\", \"DejaVu Sans Mono\", Menlo, monospace",
+  "weight_head": 700, "radius": 4, "easing": "linear", "intensity": 0.6, "density": "high",
+  "caption_bg": "rgba(12,15,13,0.9)", "caption_fg": "#d7e4d9"
+}

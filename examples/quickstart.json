@@ -1,0 +1,13 @@
+{
+  "title": "Quickstart",
+  "fps": 30,
+  "voice": {"accent": "british", "gender": "male", "speed": 1.15},
+  "scenes": [
+    {"template": "title", "narration": "Videos are code.",
+     "data": {"kicker": "hermes-motion", "title": "Prompt in, video out"}},
+    {"template": "diagram", "narration": "A storyboard becomes narration, frames, then an MP4.",
+     "data": {"nodes": [{"id": "s", "label": "Storyboard"}, {"id": "n", "label": "Narration"},
+                        {"id": "f", "label": "Frames"}, {"id": "m", "label": "MP4", "kind": "accent"}],
+              "edges": ["s -> n", "n -> f", "f -> m"]}}
+  ]
+}

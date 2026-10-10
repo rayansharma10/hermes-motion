@@ -1,0 +1,16 @@
+out/
+.venv/
+__pycache__/
+*.wav
+*.onnx
+cache/
+tmp/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+*.mp4
+*.part
+!examples/**/*.mp4
+.pytest_cache/
